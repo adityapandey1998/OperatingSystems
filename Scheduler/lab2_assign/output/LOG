@@ -229,3 +229,45 @@ DIR2-SUM ==>
 diff -b -B refout/out_6_E4 output//out_6_E4 failed
 DIR1-SUM ==> SUM: 3259 92.91 83.58 2366.30 1565.40 0.307
 DIR2-SUM ==> 
+diff -b -B refout/out_0_E2:5 output//out_0_E2:5 failed
+DIR1-SUM ==> SUM: 627 31.90 20.41 164.00 0.00 0.319
+DIR2-SUM ==> 
+diff -b -B refout/out_0_E4 output//out_0_E4 failed
+DIR1-SUM ==> SUM: 627 31.90 20.41 164.00 0.00 0.319
+DIR2-SUM ==> 
+diff -b -B refout/out_1_E2:5 output//out_1_E2:5 failed
+DIR1-SUM ==> SUM: 8237 12.14 6.53 307.60 0.00 0.061
+DIR2-SUM ==> 
+diff -b -B refout/out_1_E4 output//out_1_E4 failed
+DIR1-SUM ==> SUM: 8237 12.14 6.53 307.60 0.00 0.061
+DIR2-SUM ==> 
+diff -b -B refout/out_2_E2:5 output//out_2_E2:5 failed
+DIR1-SUM ==> SUM: 226 26.55 98.23 177.67 7.33 1.327
+DIR2-SUM ==> 
+diff -b -B refout/out_2_E4 output//out_2_E4 failed
+DIR1-SUM ==> SUM: 226 26.55 98.23 177.67 7.33 1.327
+DIR2-SUM ==> 
+diff -b -B refout/out_3_E2:5 output//out_3_E2:5 failed
+DIR1-SUM ==> SUM: 1049 24.79 16.40 154.75 44.00 0.381
+DIR2-SUM ==> 
+diff -b -B refout/out_3_E4 output//out_3_E4 failed
+DIR1-SUM ==> SUM: 1049 24.79 21.83 171.75 48.00 0.381
+DIR2-SUM ==> 
+diff -b -B refout/out_4_E2:5 output//out_4_E2:5 failed
+DIR1-SUM ==> SUM: 1112 46.76 85.70 575.50 37.25 0.360
+DIR2-SUM ==> 
+diff -b -B refout/out_4_E4 output//out_4_E4 failed
+DIR1-SUM ==> SUM: 1029 50.53 87.76 571.75 29.50 0.389
+DIR2-SUM ==> 
+diff -b -B refout/out_5_E2:5 output//out_5_E2:5 failed
+DIR1-SUM ==> SUM: 1153 86.73 60.28 804.00 303.25 0.347
+DIR2-SUM ==> 
+diff -b -B refout/out_5_E4 output//out_5_E4 failed
+DIR1-SUM ==> SUM: 1171 85.40 69.09 790.50 247.25 0.342
+DIR2-SUM ==> 
+diff -b -B refout/out_6_E2:5 output//out_6_E2:5 failed
+DIR1-SUM ==> SUM: 3468 87.31 83.77 2427.00 1616.30 0.288
+DIR2-SUM ==> 
+diff -b -B refout/out_6_E4 output//out_6_E4 failed
+DIR1-SUM ==> SUM: 3259 92.91 83.58 2366.30 1565.40 0.307
+DIR2-SUM ==> 
