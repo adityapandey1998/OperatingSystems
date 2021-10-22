@@ -12,8 +12,8 @@
 #include <unistd.h>
 
 using namespace std;
-int quantum = 10000, maxprio = 4;
-bool displayFlag = false;
+int quantum = 10000, maxprio;
+bool debug_flag=false;;
 int myrandom(int burst);
 void read_input_file(char *filename);
 void print_summary();
@@ -50,7 +50,6 @@ public:
     int cpu_burst, io_burst;
     int rem_time, rem_cpu_burst;
     int finish_time;
-    int turnaround_time;
     int io_time;
     int wait_time;
     int cur_state_time;
@@ -60,7 +59,7 @@ public:
     int static_priority, dynamic_priority;
     bool preempted, priority_reset;
 
-    Process(int arrival_time, int total_cpu_time, int cpu_burst_lim, int io_burst_lim)
+    Process(int arrival_time, int total_cpu_time, int cpu_burst_lim, int io_burst_lim, int maxprio)
     {
         static int global_id = 0;
         this->id = global_id++;
@@ -72,26 +71,24 @@ public:
         this->io_burst = 0;
         this->io_time = 0;
         this->wait_time = 0;
+        this->ready_queue_time = 0;
         this->static_priority = myrandom(maxprio);
         this->dynamic_priority = this->static_priority - 1;
         this->cur_state_time = arrival_time;
         this->cur_state = STATE_READY;
         this->preempted = false;
-        this->priority_reset = false;
     }
 
     void update_priority()
     {
         this->dynamic_priority--;
-        if (this->dynamic_priority == -1)
-        {
-            this->dynamic_priority = this->dynamic_priority - 1;
-            this->priority_reset = true;
-        }
+    }
+    void reset_priority()
+    {
+        this->dynamic_priority = this->static_priority - 1;
     }
 };
 vector<Process> process_list;
-Process *CURRENT_RUNNING_PROCESS=nullptr;
 
 class Event
 {
@@ -117,9 +114,9 @@ public:
 
 int newEventNumber()
 {
-    static int event_count = 0;
-    event_count++;
-    return event_count;
+    static int eventCount = 0;
+    eventCount++;
+    return eventCount;
 }
 struct EventComparator
 {
@@ -133,9 +130,7 @@ struct EventComparator
     }
 };
 priority_queue<Event *, vector<Event *>, EventComparator> eventQueue;
-// priority_queue<Event *, EventComparator> eventQueue;
 
-// Return next event from event queue.
 Event *get_event()
 {
     if (eventQueue.empty())
@@ -147,7 +142,7 @@ Event *get_event()
 void add_event(Event *evt)
 {
     eventQueue.push(evt);
-    if (displayFlag)
+    if (debug_flag==true)
         print_event_queue();
 }
 void rm_event()
@@ -166,12 +161,12 @@ int get_next_event_time()
 
 void print_event_queue()
 {
-    priority_queue<Event *, vector<Event *>, EventComparator> eventQueueDisp = eventQueue;
-    while (!eventQueueDisp.empty())
+    priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2 = eventQueue;
+    while (!eventQueue2.empty())
     {
-        cout << "===" << eventQueueDisp.top()->evtProcess->id << ":" << eventQueueDisp.top()->evtTimeStamp << " || ";
-        cout << "State: " << STATE_NAMES[eventQueueDisp.top()->curState] << endl;
-        eventQueueDisp.pop();
+        cout << "===" << eventQueue2.top()->evtProcess->id << ":" << eventQueue2.top()->evtTimeStamp << " - Dyn Priority: " <<eventQueue2.top()->evtProcess->dynamic_priority << " || "
+             << "State: " << STATE_NAMES[eventQueue2.top()->curState] << endl;
+        eventQueue2.pop();
     }
     cout << endl;
 }
@@ -179,10 +174,9 @@ void print_event_queue()
 class Scheduler
 {
 public:
-    // virtual function
     virtual void add_process(Process *proc) = 0;
     virtual Process *get_next_process() = 0;
-    virtual bool test_preempt(Process *p, int current_time) = 0;
+    // virtual bool test_preempt(Process *p, int current_time) = 0;
 };
 Scheduler *THE_SCHEDULER;
 
@@ -204,7 +198,6 @@ public:
         runQueue.pop_front();
         return temp;
     }
-    bool test_preempt(Process *p, int current_time) { return runQueue.empty(); }
 };
 
 class SRTF : public Scheduler
@@ -233,29 +226,12 @@ public:
         runQueue.pop_front();
         return temp;
     }
-    bool test_preempt(Process *p, int current_time) { return runQueue.empty(); }
 };
 
-class RR : public Scheduler
+class RR : public FCFS
 {
-    deque<Process *> runQueue;
-
-public:
-    void add_process(Process *proc)
-    {
-        runQueue.push_back(proc);
-        proc->dynamic_priority = proc->static_priority - 1;
-    }
-    Process *get_next_process()
-    {
-        if (runQueue.empty())
-            return nullptr;
-        Process *temp = runQueue.front();
-        runQueue.pop_front();
-        return temp;
-    }
-    bool test_preempt(Process *p, int current_time) { return runQueue.empty(); }
 };
+
 class LCFS : public Scheduler
 {
     deque<Process *> runQueue;
@@ -274,25 +250,25 @@ public:
         runQueue.pop_back();
         return temp;
     }
-    bool test_preempt(Process *p, int current_time) { return runQueue.empty(); }
 };
 
 class PRIO : public Scheduler
 {
     deque<Process *> *activeQueue, *expiredQueue;
-
+    int max_priority;
 public:
-    PRIO()
+    PRIO(int max_priority)
     {
-        this->activeQueue = new deque<Process *>[maxprio];
-        this->expiredQueue = new deque<Process *>[maxprio];
+        this->max_priority = max_priority;
+        this->activeQueue = new deque<Process *>[max_priority];
+        this->expiredQueue = new deque<Process *>[max_priority];
     }
 
     void add_process(Process *proc)
     {
-        if (proc->dynamic_priority < 0)
+        if (proc->dynamic_priority<0)
         {
-            proc->update_priority();
+            proc->dynamic_priority = proc->static_priority - 1;
             this->expiredQueue[proc->dynamic_priority].push_back(proc);
         }
         else
@@ -303,14 +279,23 @@ public:
     {
         deque<Process *> *currentQueue, *tempQueue;
 
-        if (activeQueue->empty())
+        for (int i = max_priority - 1; i >= 0; i--)
         {
-            // cout << "Switching Active and Empty Queue" << endl;
-            currentQueue = this->activeQueue;
-            this->activeQueue = this->expiredQueue;
-            this->expiredQueue = currentQueue;
+            tempQueue = &(this->activeQueue[i]);
+            if (!tempQueue->empty())
+            {
+                Process *temp_proc = tempQueue->front();
+                tempQueue->pop_front();
+                return temp_proc;
+            }
         }
-        for (int i = maxprio - 1; i >= 0; i--)
+        if (debug_flag==true)
+            cout << "Switching Active and Empty Queue" << endl;
+        currentQueue = this->activeQueue;
+        this->activeQueue = this->expiredQueue;
+        this->expiredQueue = currentQueue;
+
+        for (int i = max_priority - 1; i >= 0; i--)
         {
             tempQueue = &(this->activeQueue[i]);
             if (!tempQueue->empty())
@@ -322,41 +307,28 @@ public:
         }
         return nullptr;
     }
-    bool test_preempt(Process *p, int current_time) { return activeQueue->empty(); }
-};
-
-class PrePRIO : public Scheduler
-{
-    deque<Process *> *activeQueue, *expiredQueue;
-    PrePRIO()
-    {
-        this->activeQueue = new deque<Process *>[maxprio];
-        this->expiredQueue = new deque<Process *>[maxprio];
-    }
 };
 
 int io_count = 0, total_io_time = 0;
 void Simulation()
 {
-    if (displayFlag)
+    if (debug_flag==true)
         cout << "In Simulation" << endl;
     Event *evt;
-    CURRENT_RUNNING_PROCESS = nullptr;
+    Process *CURRENT_RUNNING_PROCESS = nullptr;
     bool CALL_SCHEDULER = false;
     int CURRENT_TIME, prev_state_dur, io_temp = 0;
     while ((evt = get_event()) != nullptr)
     {
-        // cout << "In Event While Loop" << endl;
         Process *proc = evt->evtProcess;
         CURRENT_TIME = evt->evtTimeStamp;
         prev_state_dur = CURRENT_TIME - evt->prevTimeStamp;
-
         switch (evt->curState)
         {
         case STATE_READY:
         {
-            if (displayFlag)
-                cout << "---In STATE_BLOCKED" << endl;
+            if (debug_flag==true)
+                cout << "---In STATE_READY" << endl;
 
             if (evt->prevState == STATE_BLOCKED)
             {
@@ -374,17 +346,13 @@ void Simulation()
 
         case STATE_RUNNING:
         {
-            if (displayFlag)
+            if (debug_flag==true)
                 cout << "---In STATE_RUNNING" << endl;
-
             proc->wait_time += prev_state_dur;
             int new_cpu_burst;
             if (proc->preempted && proc->rem_cpu_burst != 0)
-            {
                 new_cpu_burst = proc->rem_cpu_burst;
-            }
-            else
-            {
+            else {
                 new_cpu_burst = myrandom(proc->cpu_burst_lim);
 
                 if (new_cpu_burst >= proc->rem_time)
@@ -408,18 +376,32 @@ void Simulation()
                 else
                     newState = STATE_BLOCKED;
             }
-            newEvent = new Event(proc, newEventTime, CURRENT_TIME, newState, STATE_RUNNING, newEventNumber());
-            add_event(newEvent);
+            Event *newEvt;
+            if (new_cpu_burst > quantum)
+            {
+                newEvt = new Event(proc, CURRENT_TIME + quantum, CURRENT_TIME, STATE_PREEMPT, STATE_RUNNING, newEventNumber());
+            }
+            else if (new_cpu_burst == proc->rem_time)
+            {
+                newEvt = new Event(proc, CURRENT_TIME + new_cpu_burst, CURRENT_TIME, STATE_DONE, STATE_RUNNING, newEventNumber());
+            }
+            else
+            {
+                newEvt = new Event(proc, CURRENT_TIME + new_cpu_burst, CURRENT_TIME, STATE_BLOCKED, STATE_RUNNING, newEventNumber());
+            }
+
+            add_event(newEvt);
             break;
         }
 
         case STATE_BLOCKED:
         {
-            if (displayFlag)
+            if (debug_flag==true)
                 cout << "---In STATE_BLOCKED" << endl;
 
             Event *newEvent;
             proc->preempted = false;
+
             CURRENT_RUNNING_PROCESS = nullptr;
             if (io_count == 0)
                 io_temp = CURRENT_TIME;
@@ -439,7 +421,7 @@ void Simulation()
 
         case STATE_DONE:
         {
-            if (displayFlag)
+            if (debug_flag==true)
                 cout << "---In STATE_DONE" << endl;
             CURRENT_RUNNING_PROCESS = nullptr;
             CALL_SCHEDULER = true;
@@ -448,8 +430,8 @@ void Simulation()
         }
 
         case STATE_PREEMPT:
-        { //running to ready
-            if (displayFlag)
+        { 
+            if (debug_flag==true)
                 cout << "---In STATE_PREEMPT" << endl;
 
             CURRENT_RUNNING_PROCESS = nullptr;
@@ -457,20 +439,23 @@ void Simulation()
             proc->preempted = true;
             proc->ready_queue_time = CURRENT_TIME;
             proc->rem_time -= prev_state_dur;
-            proc->cpu_burst -= prev_state_dur;
+            proc->rem_cpu_burst -= prev_state_dur;
             // --
             proc->update_priority();
             THE_SCHEDULER->add_process(proc);
+            if (debug_flag==true)
+                cout << "---End STATE_PREEMPT" << endl;
             break;
         }
         }
+
         delete evt;
         evt = nullptr;
         if (CALL_SCHEDULER == true)
         {
-
             if (get_next_event_time() == CURRENT_TIME)
                 continue;
+            
             CALL_SCHEDULER = false;
             if (CURRENT_RUNNING_PROCESS == nullptr)
             {
@@ -480,7 +465,6 @@ void Simulation()
                 Event *newEvent = new Event(CURRENT_RUNNING_PROCESS, CURRENT_TIME, CURRENT_RUNNING_PROCESS->ready_queue_time, STATE_RUNNING, STATE_READY, newEventNumber());
                 add_event(newEvent);
             }
-            // cout << "----Call Scheduler = True Ended" << endl;
         }
     }
 }
@@ -489,17 +473,18 @@ int main(int argc, char **argv)
 {
     char *input_file = argv[argc - 2];
     char *rand_file = argv[argc - 1];
-
-    int choice;
+    if (debug_flag==true)
+        cout << input_file << " " << rand_file << endl;
+    int c;
     char *cvalue = NULL;
-    while ((choice = getopt(argc, argv, "vs:")) != -1)
-        switch (choice)
+    while ((c = getopt(argc, argv, "vs:")) != -1)
+        switch (c)
         {
-        case 'v':
-            displayFlag = true;
-            break;
         case 's':
             cvalue = optarg;
+            break;
+        case 'v':
+            debug_flag=true;
             break;
         case '?':
             if (optopt == 's')
@@ -508,48 +493,52 @@ int main(int argc, char **argv)
         default:
             abort();
         }
-    if (displayFlag)
+    if (debug_flag==true)
         cout << "Value with -s: " << optarg << endl;
     char sched_type = optarg[0];
     char ch;
-
     rand_vals = read_random_file(rand_file);
-
-    // start simulation
-
-    read_input_file(input_file);
+    maxprio=4;
 
     switch (sched_type)
     {
-    case 'F':
-        cout << "FCFS" << endl;
-        THE_SCHEDULER = new FCFS();
-        break;
-    case 'L':
-        cout << "LCFS" << endl;
-        THE_SCHEDULER = new LCFS();
-        break;
-    case 'S':
-        cout << "SRTF" << endl;
-        THE_SCHEDULER = new SRTF();
-        break;
-    case 'R':
-        sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
-        cout << "RR " << quantum << endl;
-        THE_SCHEDULER = new RR();
-        // cout << maxprio <<endl;
-        break;
-    case 'P':
-        sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
-        cout << "PRIO " << quantum << endl;
-        THE_SCHEDULER = new PRIO();
-        // cout << maxprio <<endl;
-        break;
-    case 'E':
-        sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
-        cout << "PREPRIO " << quantum << endl;
-        // cout << maxprio <<endl;
-        break;
+        case 'F':
+            cout << "FCFS" << endl;
+            read_input_file(input_file);
+            THE_SCHEDULER = new FCFS();
+            break;
+        
+        case 'L':
+            cout << "LCFS" << endl;
+            read_input_file(input_file);
+            THE_SCHEDULER = new LCFS();
+            break;
+        
+        case 'S':
+            cout << "SRTF" << endl;
+            read_input_file(input_file);
+            THE_SCHEDULER = new SRTF();
+            break;
+        
+        case 'R':
+            sscanf(optarg, "%c%d", &ch, &quantum);
+            cout << "RR " << quantum << endl;
+            read_input_file(input_file);
+            THE_SCHEDULER = new RR();
+            break;
+        
+        case 'P':
+            sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
+            cout << "PRIO " << quantum << endl;
+            read_input_file(input_file);
+            THE_SCHEDULER = new PRIO(maxprio);
+            break;
+        
+        case 'E':
+            sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
+            cout << "PREPRIO " << quantum << endl;
+            read_input_file(input_file);
+            break;
     }
 
     Simulation();
@@ -588,20 +577,19 @@ void read_input_file(char *filename)
         istringstream stream(line);
         if (!(stream >> AT >> TC >> CB >> IO))
             throw std::runtime_error("invalid data");
-        // process data here
-        // cout << "Process Info: " << AT << " " << TC << " " << CB << " " << IO << endl;
-        Process curr_proc = Process(AT, TC, CB, IO);
+
+        if (debug_flag==true)
+            cout << "Process Info: " << AT << " " << TC << " " << CB << " " << IO << endl;
+        Process curr_proc = Process(AT, TC, CB, IO, maxprio);
         process_list.push_back(curr_proc);
     }
 
     for (int i = 0; i < process_list.size(); i++)
     {
         Event *event = new Event(&process_list[i], process_list[i].arrival_time, process_list[i].arrival_time, STATE_READY, STATE_CREATED, newEventNumber());
-        // cout<< "--Adding event for initial input: "<<endl;
-        // cout<<"---Arrival Time: "<<event->evtTimeStamp<<endl;
         add_event(event);
     }
-    if (displayFlag)
+    if (debug_flag==true)
         print_event_queue();
 }
 
