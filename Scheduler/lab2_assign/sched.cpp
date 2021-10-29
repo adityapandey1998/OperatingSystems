@@ -12,7 +12,8 @@
 #include <unistd.h>
 using namespace std;
 int maxprio;
-bool debug_flag = false;;
+bool debug_flag = false;
+;
 int myrandom(int burst);
 void read_input_file(char *filename);
 void print_summary();
@@ -26,10 +27,9 @@ typedef enum
     STATE_READY,
     STATE_DONE,
     STATE_PREEMPT,
-}
-process_state_t;
+} process_state_t;
 
-string STATE_NAMES[] = { "RUNNING", "BLOCK", "CREATED", "READY", "DONE", "PREEMPT" };
+string STATE_NAMES[] = {"RUNNING", "BLOCK", "CREATED", "READY", "DONE", "PREEMPT"};
 typedef enum
 {
     TRANS_TO_READY,
@@ -37,8 +37,7 @@ typedef enum
     TRANS_TO_BLOCK,
     TRANS_TO_PREEMPT,
     TRANS_TO_DONE
-}
-event_transition_t;
+} event_transition_t;
 
 vector<int> rand_vals;
 int rsize;
@@ -90,11 +89,12 @@ public:
     }
 };
 vector<Process> process_list;
+Process *CURRENT_RUNNING_PROCESS = nullptr;
 
 class Event
 {
 public:
-    Process * evtProcess;
+    Process *evtProcess;
     int evtTimeStamp;
     int prevTimeStamp;
     int eventNum;
@@ -130,9 +130,9 @@ struct EventComparator
         return event1->eventNum > event2->eventNum;
     }
 };
-priority_queue<Event*, vector<Event*>, EventComparator> eventQueue;
+priority_queue<Event *, vector<Event *>, EventComparator> eventQueue;
 
-Event* get_event()
+Event *get_event()
 {
     if (eventQueue.empty())
         return nullptr;
@@ -162,11 +162,11 @@ int get_next_event_time()
 
 void print_event_queue()
 {
-    priority_queue<Event*, vector<Event*>, EventComparator> eventQueue2 = eventQueue;
+    priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2 = eventQueue;
     while (!eventQueue2.empty())
     {
-        cout << "===" << eventQueue2.top()->evtProcess->id << ":" << eventQueue2.top()->evtTimeStamp << " - Dyn Priority: " << eventQueue2.top()->evtProcess->dynamic_priority << " || " <<
-             "State: " << STATE_NAMES[eventQueue2.top()->curState] << endl;
+        cout << "===" << eventQueue2.top()->evtProcess->id << ":" << eventQueue2.top()->evtTimeStamp << " - Dyn Priority: " << eventQueue2.top()->evtProcess->dynamic_priority << " || "
+             << "State: " << STATE_NAMES[eventQueue2.top()->curState] << endl;
         eventQueue2.pop();
     }
     cout << endl;
@@ -177,14 +177,14 @@ class Scheduler
 public:
     int quantum;
     virtual void add_process(Process *proc) = 0;
-    virtual Process* get_next_process() = 0;
+    virtual Process *get_next_process() = 0;
     // virtual bool test_preempt(Process *p, int current_time) = 0;
 };
-Scheduler * THE_SCHEDULER;
+Scheduler *THE_SCHEDULER;
 
-class FCFS: public Scheduler
+class FCFS : public Scheduler
 {
-    deque<Process*> runQueue;
+    deque<Process *> runQueue;
 
 public:
     FCFS()
@@ -196,7 +196,7 @@ public:
         runQueue.push_back(proc);
         proc->dynamic_priority = proc->static_priority - 1;
     }
-    Process* get_next_process()
+    Process *get_next_process()
     {
         if (runQueue.empty())
             return nullptr;
@@ -206,10 +206,10 @@ public:
     }
 };
 
-class SRTF: public Scheduler
+class SRTF : public Scheduler
 {
-    deque<Process*> runQueue;
-    Process * temp_proc;
+    deque<Process *> runQueue;
+    Process *temp_proc;
 
 public:
     SRTF()
@@ -228,7 +228,7 @@ public:
         runQueue.insert(runQueue.begin() + i, proc);
         proc->dynamic_priority = proc->static_priority - 1;
     }
-    Process* get_next_process()
+    Process *get_next_process()
     {
         if (runQueue.empty())
             return nullptr;
@@ -238,9 +238,10 @@ public:
     }
 };
 
-class RR: public Scheduler
+class RR : public Scheduler
 {
-    deque<Process*> runQueue;
+    deque<Process *> runQueue;
+
 public:
     RR(int quantum = 10000)
     {
@@ -251,7 +252,7 @@ public:
         runQueue.push_back(proc);
         proc->dynamic_priority = proc->static_priority - 1;
     }
-    Process* get_next_process()
+    Process *get_next_process()
     {
         if (runQueue.empty())
             return nullptr;
@@ -261,9 +262,9 @@ public:
     }
 };
 
-class LCFS: public Scheduler
+class LCFS : public Scheduler
 {
-    deque<Process*> runQueue;
+    deque<Process *> runQueue;
 
 public:
     LCFS(int quantum = 10000)
@@ -276,7 +277,7 @@ public:
         runQueue.push_back(proc);
         proc->dynamic_priority = proc->static_priority - 1;
     }
-    Process* get_next_process()
+    Process *get_next_process()
     {
         if (runQueue.empty())
             return nullptr;
@@ -286,9 +287,9 @@ public:
     }
 };
 
-class PRIO: public Scheduler
+class PRIO : public Scheduler
 {
-    deque<Process*> *activeQueue, *expiredQueue;
+    deque<Process *> *activeQueue, *expiredQueue;
     int max_priority;
 
 public:
@@ -296,8 +297,8 @@ public:
     {
         this->quantum = quantum;
         this->max_priority = max_priority;
-        this->activeQueue = new deque<Process*>[max_priority];
-        this->expiredQueue = new deque<Process*>[max_priority];
+        this->activeQueue = new deque<Process *>[max_priority];
+        this->expiredQueue = new deque<Process *>[max_priority];
     }
 
     void add_process(Process *proc)
@@ -311,9 +312,9 @@ public:
             this->activeQueue[proc->dynamic_priority].push_back(proc);
     }
 
-    Process* get_next_process()
+    Process *get_next_process()
     {
-        deque<Process*> *currentQueue, *tempQueue;
+        deque<Process *> *currentQueue, *tempQueue;
 
         for (int i = max_priority - 1; i >= 0; i--)
         {
@@ -345,13 +346,147 @@ public:
     }
 };
 
+class PrePRIO : public Scheduler
+{
+    deque<Process *> *activeQueue, *expiredQueue;
+    deque<Event *> eventDeque;
+    int max_priority;
+
+    deque<Event *> convertToDequeue(priority_queue<Event *, vector<Event *>, EventComparator> eventQueue)
+    {
+        priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2 = eventQueue;
+        deque<Event *> eventDeque2;
+        while (!eventQueue2.empty())
+        {
+            eventDeque2.push_back(eventQueue2.top());
+            eventQueue2.pop();
+        }
+
+        return eventDeque2;
+    }
+
+    priority_queue<Event *, vector<Event *>, EventComparator> convertToPrio(deque<Event *> eventDeque2)
+    {
+        priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2;
+        for (int i = 0; i < eventDeque2.size(); i++)
+        {
+            eventQueue2.push(eventDeque2[i]);
+        }
+        return eventQueue2;
+    }
+
+public:
+    PrePRIO(int max_priority, int quantum)
+    {
+        this->quantum = quantum;
+        this->max_priority = max_priority;
+        this->activeQueue = new deque<Process *>[max_priority];
+        this->expiredQueue = new deque<Process *>[max_priority];
+    }
+
+    Process *get_next_process()
+    {
+        deque<Process *> *currentQueue, *tempQueue;
+
+        for (int i = max_priority - 1; i >= 0; i--)
+        {
+            tempQueue = &(this->activeQueue[i]);
+            if (!tempQueue->empty())
+            {
+                Process *temp_proc = tempQueue->front();
+                tempQueue->pop_front();
+                return temp_proc;
+            }
+        }
+        if (debug_flag == true)
+            cout << "Switching Active and Empty Queue" << endl;
+        currentQueue = this->activeQueue;
+        this->activeQueue = this->expiredQueue;
+        this->expiredQueue = currentQueue;
+
+        for (int i = max_priority - 1; i >= 0; i--)
+        {
+            tempQueue = &(this->activeQueue[i]);
+            if (!tempQueue->empty())
+            {
+                Process *temp_proc = tempQueue->front();
+                tempQueue->pop_front();
+                return temp_proc;
+            }
+        }
+        return nullptr;
+    }
+
+    int getCurrentProcessTime()
+    {
+        eventDeque = convertToDequeue(eventQueue);
+        for (int i = 0; i < eventDeque.size(); i++)
+        {
+            if (eventDeque[i]->evtProcess == CURRENT_RUNNING_PROCESS)
+                return eventDeque[i]->evtTimeStamp;
+        }
+        return -1;
+    }
+
+    void add_process(Process *proc)
+    {
+        if (proc->dynamic_priority < 0)
+        {
+            proc->dynamic_priority = proc->static_priority - 1;
+            this->expiredQueue[proc->dynamic_priority].push_back(proc);
+        }
+        else if (CURRENT_RUNNING_PROCESS == nullptr)
+        {
+            this->activeQueue[proc->dynamic_priority].push_back(proc);
+        }
+        else
+        {
+            int currProcessTime = getCurrentProcessTime();
+            if ((proc->dynamic_priority > CURRENT_RUNNING_PROCESS->dynamic_priority) && (proc->ready_queue_time != currProcessTime))
+            {
+
+                this->activeQueue[proc->dynamic_priority].push_back(proc);
+                int modifiedTimestamp = -1;
+                Event *tempEvent;
+                int index = 0;
+
+                deque<Event *> eventDeque = convertToDequeue(eventQueue);
+
+                while (index < eventDeque.size())
+                {
+                    tempEvent = eventDeque[index];
+                    if (tempEvent->evtProcess == CURRENT_RUNNING_PROCESS)
+                    {
+                        int res = tempEvent->prevTimeStamp;
+                        eventDeque.erase(eventDeque.begin() + index);
+                        eventQueue = convertToPrio(eventDeque);
+                        modifiedTimestamp = res;
+                        break;
+                    }
+                    index++;
+                }
+                Event *newEvent = new Event(CURRENT_RUNNING_PROCESS, proc->ready_queue_time, modifiedTimestamp, STATE_PREEMPT, STATE_RUNNING, newEventNumber());
+
+                if (debug_flag == true)
+                    print_event_queue();
+
+                add_event(newEvent);
+                if (debug_flag == true)
+                    print_event_queue();
+            }
+            else
+            {
+                this->activeQueue[proc->dynamic_priority].push_back(proc);
+            }
+        }
+    }
+};
 int io_count = 0, total_io_time = 0;
 void Simulation()
 {
     if (debug_flag == true)
         cout << "In Simulation" << endl;
-    Event * evt;
-    Process *CURRENT_RUNNING_PROCESS = nullptr;
+    Event *evt;
     bool CALL_SCHEDULER = false;
     int CURRENT_TIME, prev_state_dur, io_temp = 0;
     while ((evt = get_event()) != nullptr)
@@ -397,7 +532,7 @@ void Simulation()
                 proc->rem_cpu_burst = new_cpu_burst;
             }
 
-            Event * newEvent;
+            Event *newEvent;
             int newEventTime = 0;
             process_state_t newState;
             if (new_cpu_burst > THE_SCHEDULER->quantum)
@@ -413,7 +548,7 @@ void Simulation()
                 else
                     newState = STATE_BLOCKED;
             }
-            Event * newEvt;
+            Event *newEvt;
             if (new_cpu_burst > THE_SCHEDULER->quantum)
             {
                 newEvt = new Event(proc, CURRENT_TIME + THE_SCHEDULER->quantum, CURRENT_TIME, STATE_PREEMPT, STATE_RUNNING, newEventNumber());
@@ -436,7 +571,7 @@ void Simulation()
             if (debug_flag == true)
                 cout << "---In STATE_BLOCKED" << endl;
 
-            Event * newEvent;
+            Event *newEvent;
             proc->preempted = false;
 
             CURRENT_RUNNING_PROCESS = nullptr;
@@ -575,6 +710,7 @@ int main(int argc, char **argv)
         sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
         cout << "PREPRIO " << quantum << endl;
         read_input_file(input_file);
+        THE_SCHEDULER = new PrePRIO(maxprio, quantum);
         break;
     }
 
@@ -637,7 +773,7 @@ void print_summary()
     double total_cpu_time = 0, total_tat = 0, total_wait_time = 0;
     double count = double(process_list.size());
     int count2 = 0;
-    Process * proc;
+    Process *proc;
     for (int i = 0; i < process_list.size(); i++)
     {
         proc = &process_list[i];
@@ -664,9 +800,9 @@ void print_summary()
     double finish_time = double(final_finish_time);
     printf("SUM: %d %.2lf %.2lf %.2lf %.2lf %.3lf\n",
            final_finish_time,
-           (total_cpu_time / finish_time) *100.00,
-           ((double) total_io_time / finish_time) *100.00,
+           (total_cpu_time / finish_time) * 100.00,
+           ((double)total_io_time / finish_time) * 100.00,
            total_tat / count2,
            total_wait_time / count2,
-           (count2 *100) / finish_time);
+           (count2 * 100) / finish_time);
 }
