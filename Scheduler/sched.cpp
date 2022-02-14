@@ -1,3 +1,12 @@
+/* 
+OS Assignment 2 - Scheduler
+Aditya Pandey - ap6624
+
+Note: 
+- Use of "-std=c++11" necessary on linserv
+- Unzip file and run "make"
+- Execute scheduler by using this command - ./sched -s<Priority_Flag> <Input FIle> <Random File>
+*/
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -11,14 +20,18 @@
 #include <stdio.h>
 #include <unistd.h>
 using namespace std;
-int maxprio;
-bool debug_flag = false;
-;
+
 int myrandom(int burst);
 void read_input_file(char *filename);
 void print_summary();
-vector<int> read_random_file(string filename);
 void print_event_queue();
+
+int maxprio;
+bool debug_flag = false;
+int rsize;
+vector<int> read_random_file(string filename);
+vector<int> rand_vals;
+
 typedef enum
 {
     STATE_RUNNING,
@@ -39,9 +52,8 @@ typedef enum
     TRANS_TO_DONE
 } event_transition_t;
 
-vector<int> rand_vals;
-int rsize;
 class Event;
+/* Process Class */
 class Process
 {
 public:
@@ -88,9 +100,19 @@ public:
         this->dynamic_priority = this->static_priority - 1;
     }
 };
+/* 
+The process_list stores the processes read from the input file.
+*/
+
 vector<Process> process_list;
+
+/* 
+The CURRENT_RUNNING_PROCESS is a global variable contains the current process. 
+This is used in the preemprtive priority queue to handle the preemtive conditions.
+*/
 Process *CURRENT_RUNNING_PROCESS = nullptr;
 
+/* Event Class */
 class Event
 {
 public:
@@ -113,12 +135,18 @@ public:
     }
 };
 
+/* 
+Generate a new number to break event tiebreakers in the Event Queue
+*/
 int newEventNumber()
 {
     static int eventCount = 0;
     eventCount++;
     return eventCount;
 }
+/* 
+Break event tiebreakers in the Event Queue
+*/
 struct EventComparator
 {
     bool operator()(const Event *event1, const Event *event2)
@@ -132,6 +160,9 @@ struct EventComparator
 };
 priority_queue<Event *, vector<Event *>, EventComparator> eventQueue;
 
+/* 
+Event helper functions
+*/
 Event *get_event()
 {
     if (eventQueue.empty())
@@ -150,6 +181,10 @@ void rm_event()
 {
     eventQueue.pop();
 }
+
+/* 
+Get the time of the next event to use in simulation
+*/
 int get_next_event_time()
 {
     if (eventQueue.empty())
@@ -160,6 +195,9 @@ int get_next_event_time()
     return next_event_time;
 }
 
+/* 
+Helper function to print the current queue
+*/
 void print_event_queue()
 {
     priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2 = eventQueue;
@@ -179,9 +217,11 @@ public:
     virtual void add_process(Process *proc) = 0;
     virtual Process *get_next_process() = 0;
     // virtual bool test_preempt(Process *p, int current_time) = 0;
+    // The logic for this function was baked into the add process function in Preemptive priority itself
 };
 Scheduler *THE_SCHEDULER;
 
+// We are using deques to implement the RunQueue/ActiveQueue/ExpiredQueue in all the Scheduling classes
 class FCFS : public Scheduler
 {
     deque<Process *> runQueue;
@@ -293,6 +333,9 @@ class PRIO : public Scheduler
     int max_priority;
 
 public:
+    /* 
+    We initialize two empty queues - active and expired
+    */
     PRIO(int max_priority, int quantum)
     {
         this->quantum = quantum;
@@ -312,6 +355,9 @@ public:
             this->activeQueue[proc->dynamic_priority].push_back(proc);
     }
 
+    /* 
+    While getting the next process, we iterate through all the diff priority queues and pick the first event in each queue
+    */
     Process *get_next_process()
     {
         deque<Process *> *currentQueue, *tempQueue;
@@ -352,6 +398,10 @@ class PrePRIO : public Scheduler
     deque<Event *> eventDeque;
     int max_priority;
 
+    /*
+    One drawback of using priority queues to keep track of events is that we cannot arbitrarily modify items in the heap.
+    Therefore, for Preemptive priority, we need to convert the priority queue to a deque if we need to delete/insert/modify a specific item.
+    */
     deque<Event *> convertToDequeue(priority_queue<Event *, vector<Event *>, EventComparator> eventQueue)
     {
         priority_queue<Event *, vector<Event *>, EventComparator> eventQueue2 = eventQueue;
@@ -442,6 +492,7 @@ public:
         else
         {
             int currProcessTime = getCurrentProcessTime();
+            // This is the tiebreak condition which points us to the preemption
             if ((proc->dynamic_priority > CURRENT_RUNNING_PROCESS->dynamic_priority) && (proc->ready_queue_time != currProcessTime))
             {
 
@@ -455,6 +506,7 @@ public:
                 while (index < eventDeque.size())
                 {
                     tempEvent = eventDeque[index];
+                    // We need to update the process event in this case 
                     if (tempEvent->evtProcess == CURRENT_RUNNING_PROCESS)
                     {
                         int res = tempEvent->prevTimeStamp;
@@ -467,12 +519,16 @@ public:
                 }
                 Event *newEvent = new Event(CURRENT_RUNNING_PROCESS, proc->ready_queue_time, modifiedTimestamp, STATE_PREEMPT, STATE_RUNNING, newEventNumber());
 
-                if (debug_flag == true)
+                if (debug_flag == true) {
                     print_event_queue();
+                    cout<<"Queue before preeption update ^"<<endl;
+                }
 
                 add_event(newEvent);
-                if (debug_flag == true)
+                if (debug_flag == true) {
                     print_event_queue();
+                    cout<<"Queue after preeption update ^"<<endl;
+                }
             }
             else
             {
@@ -481,7 +537,9 @@ public:
         }
     }
 };
+// I/O variables are used to keep track of the I/O happening and to note the I/O utilization and time durations
 int io_count = 0, total_io_time = 0;
+
 void Simulation()
 {
     if (debug_flag == true)
@@ -494,8 +552,10 @@ void Simulation()
         Process *proc = evt->evtProcess;
         CURRENT_TIME = evt->evtTimeStamp;
         prev_state_dur = CURRENT_TIME - evt->prevTimeStamp;
+        // We can switch on the evt->curStata 
+        // This is the same as the TRANSITION_TO as we are keeping track of the previous state for each event (with the timestamp)
         switch (evt->curState)
-        {
+        {            
         case STATE_READY:
         {
             if (debug_flag == true)
@@ -521,6 +581,7 @@ void Simulation()
                 cout << "---In STATE_RUNNING" << endl;
             proc->wait_time += prev_state_dur;
             int new_cpu_burst;
+            // We need to clip the CPU burst to the quantum
             if (proc->preempted && proc->rem_cpu_burst != 0)
                 new_cpu_burst = proc->rem_cpu_burst;
             else
@@ -549,6 +610,8 @@ void Simulation()
                     newState = STATE_BLOCKED;
             }
             Event *newEvt;
+            
+            // Based on the new cpu burst, the state transitions will be different
             if (new_cpu_burst > THE_SCHEDULER->quantum)
             {
                 newEvt = new Event(proc, CURRENT_TIME + THE_SCHEDULER->quantum, CURRENT_TIME, STATE_PREEMPT, STATE_RUNNING, newEventNumber());
@@ -566,6 +629,7 @@ void Simulation()
             break;
         }
 
+        // Blocked State
         case STATE_BLOCKED:
         {
             if (debug_flag == true)
@@ -588,9 +652,12 @@ void Simulation()
             break;
         }
 
+        // Created State
+        // We don't do anything here as the event to ready is created by default
         case STATE_CREATED:
             break;
 
+        // Done State
         case STATE_DONE:
         {
             if (debug_flag == true)
@@ -601,6 +668,7 @@ void Simulation()
             break;
         }
 
+        // Preempted State
         case STATE_PREEMPT:
         {
             if (debug_flag == true)
@@ -612,7 +680,7 @@ void Simulation()
             proc->ready_queue_time = CURRENT_TIME;
             proc->rem_time -= prev_state_dur;
             proc->rem_cpu_burst -= prev_state_dur;
-            // --
+
             proc->update_priority();
             THE_SCHEDULER->add_process(proc);
             if (debug_flag == true)
@@ -648,76 +716,63 @@ int main(int argc, char **argv)
     if (debug_flag == true)
         cout << input_file << " " << rand_file << endl;
     int c;
-    char *cvalue = NULL;
+    char sched_type;
+    char ch;
+    maxprio = 4;
+    int quantum;
+
     while ((c = getopt(argc, argv, "vs:")) != -1)
         switch (c)
         {
         case 's':
-            cvalue = optarg;
+            sched_type = optarg[0];
+            rand_vals = read_random_file(rand_file);
+            switch (sched_type)
+            {
+            case 'F':
+                cout << "FCFS" << endl;
+                THE_SCHEDULER = new FCFS();
+                break;
+
+            case 'L':
+                cout << "LCFS" << endl;
+                THE_SCHEDULER = new LCFS();
+                break;
+
+            case 'S':
+                cout << "SRTF" << endl;
+                THE_SCHEDULER = new SRTF();
+                break;
+
+            case 'R':
+                quantum = atoi(optarg + 1);
+                cout << "RR " << quantum << endl;
+                THE_SCHEDULER = new RR(quantum);
+                break;
+
+            case 'P':
+                sscanf(optarg + 1, "%d:%d", &quantum, &maxprio);
+                cout << "PRIO " << quantum << endl;
+                THE_SCHEDULER = new PRIO(maxprio, quantum);
+                break;
+
+            case 'E':
+                sscanf(optarg + 1, "%d:%d", &quantum, &maxprio);
+                cout << "PREPRIO " << quantum << endl;
+                THE_SCHEDULER = new PrePRIO(maxprio, quantum);
+                break;
+            }
             break;
         case 'v':
             debug_flag = true;
             break;
-        case '?':
-            if (optopt == 's')
-                fprintf(stderr, "Option -%c requires an argument.\n", optopt);
-            return 1;
-        default:
-            abort();
         }
-    if (debug_flag == true)
-        cout << "Value with -s: " << optarg << endl;
-    char sched_type = optarg[0];
-    char ch;
-    rand_vals = read_random_file(rand_file);
-    maxprio = 4;
-    int quantum;
-    switch (sched_type)
-    {
-    case 'F':
-        cout << "FCFS" << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new FCFS();
-        break;
-
-    case 'L':
-        cout << "LCFS" << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new LCFS();
-        break;
-
-    case 'S':
-        cout << "SRTF" << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new SRTF();
-        break;
-
-    case 'R':
-        sscanf(optarg, "%c%d", &ch, &quantum);
-        cout << "RR " << quantum << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new RR(quantum);
-        break;
-
-    case 'P':
-        sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
-        cout << "PRIO " << quantum << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new PRIO(maxprio, quantum);
-        break;
-
-    case 'E':
-        sscanf(optarg, "%c%d:%d", &ch, &quantum, &maxprio);
-        cout << "PREPRIO " << quantum << endl;
-        read_input_file(input_file);
-        THE_SCHEDULER = new PrePRIO(maxprio, quantum);
-        break;
-    }
-
+    read_input_file(input_file);
     Simulation();
     print_summary();
 }
 
+// We have a helper function to read in the random file and store it in a vector
 vector<int> read_random_file(string filename)
 {
     ifstream rand_file(filename);
@@ -732,6 +787,7 @@ vector<int> read_random_file(string filename)
     return rand_vals;
 }
 
+// We have a helper function to read random vector and return the "clipped" random nymber in a cyclic format
 int myrandom(int burst)
 {
     static int ofs = 0;
@@ -740,6 +796,8 @@ int myrandom(int burst)
     return rand_value;
 }
 
+// We have a helper function to read in the random file and store it in a vector
+// We also create the initial events for the scheduer and add it to the event queue
 void read_input_file(char *filename)
 {
     ifstream proc_file(filename);
@@ -766,12 +824,12 @@ void read_input_file(char *filename)
         print_event_queue();
 }
 
+// We have a function to print all the statistics of the Scheduler Execution
 void print_summary()
 {
     int final_finish_time = 0;
     int proc_tat;
     double total_cpu_time = 0, total_tat = 0, total_wait_time = 0;
-    double count = double(process_list.size());
     int count2 = 0;
     Process *proc;
     for (int i = 0; i < process_list.size(); i++)
